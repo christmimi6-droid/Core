@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NeonVault Dashboard</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: "#00ff9d",
+        bg: "#0B0E11",
+        card: "#11151b"
+      }
+    }
+  }
+}
+</script>
+
+<style>
+body {
+  background: radial-gradient(circle at top, #0f141a, #0B0E11);
+}
+.glow {
+  box-shadow: 0 0 25px rgba(0,255,157,0.15);
+}
+.fade {
+  transition: all 0.3s ease;
+}
+</style>
+</head>
+
+<body class="text-white font-sans">
+
+<!-- HEADER -->
+<header class="p-6 flex justify-between items-center border-b border-gray-800">
+  <h1 class="text-xl font-semibold tracking-wide">NeonVault <span class="text-primary">Dashboard</span></h1>
+  <button onclick="openDeposit()" class="bg-primary text-black px-4 py-2 rounded-lg font-semibold hover:opacity-80 transition">
+    Invest Now
+  </button>
+</header>
+
+<!-- MAIN GRID -->
+<main class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+  <!-- BALANCE CARD -->
+  <div class="bg-card p-5 rounded-xl glow">
+    <p class="text-gray-400">Total Earnings</p>
+    <h2 id="earnings" class="text-2xl font-bold">0.00 BTC</h2>
+  </div>
+
+  <div class="bg-card p-5 rounded-xl glow">
+    <p class="text-gray-400">Active Deposit</p>
+    <h2 id="deposit" class="text-2xl font-bold">0.00 BTC</h2>
+  </div>
+
+  <div class="bg-card p-5 rounded-xl glow">
+    <p class="text-gray-400">Available Balance</p>
+    <h2 id="balance" class="text-2xl font-bold">0.00 BTC</h2>
+  </div>
+
+  <!-- WITHDRAW -->
+  <div class="md:col-span-3 bg-card p-5 rounded-xl glow flex justify-between items-center">
+    <div>
+      <p class="text-gray-400">Withdraw Returns</p>
+      <p id="withdrawNote" class="text-xs text-gray-500">
+        Maintain an active deposit to unlock withdrawals.
+      </p>
+    </div>
+
+    <button id="withdrawBtn"
+      onclick="openWithdraw()"
+      disabled
+      class="bg-gray-700 text-gray-400 px-5 py-2 rounded-lg cursor-not-allowed transition">
+      Locked
+    </button>
+  </div>
+
+  <!-- LIVE ACTIVITY -->
+  <div class="md:col-span-2 bg-card p-5 rounded-xl glow h-80 overflow-hidden">
+    <h3 class="font-semibold mb-3">Live Platform Activity</h3>
+    <div id="activity" class="space-y-2 text-sm text-gray-300"></div>
+  </div>
+
+  <!-- LEDGER -->
+  <div class="bg-card p-5 rounded-xl glow h-80 overflow-y-auto">
+    <h3 class="font-semibold mb-3">Transaction Ledger</h3>
+    <div id="ledger" class="space-y-2 text-sm text-gray-300"></div>
+  </div>
+
+</main>
+
+<!-- DEPOSIT MODAL -->
+<div id="depositModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+  <div class="bg-[#11151b] p-6 rounded-xl w-[90%] md:w-[500px]">
+    <h2 class="text-lg font-semibold mb-4">Deposit Bitcoin</h2>
+
+    <div class="bg-black p-3 rounded mb-3 flex justify-between items-center">
+      <span class="text-xs break-all">bc1qfjxjpv2ee3el6yr8jxnga0tgp2krsjd4azr08x</span>
+      <button onclick="copyAddr()" class="text-primary text-xs">Copy</button>
+    </div>
+
+    <div class="h-24 bg-gray-900 rounded mb-3 flex items-center justify-center text-gray-500 text-xs">
+      QR CODE PLACEHOLDER
+    </div>
+
+    <input id="amountInput" type="text" placeholder="Amount Sent (BTC)"
+      class="w-full p-2 mb-2 rounded bg-black border border-gray-700"/>
+
+    <input id="txInput" type="text" placeholder="Transaction Hash / TxID"
+      class="w-full p-2 mb-4 rounded bg-black border border-gray-700"/>
+
+    <button onclick="submitDeposit()"
+      class="w-full bg-primary text-black py-2 rounded font-semibold">
+      Submit Deposit Verification
+    </button>
+
+    <button onclick="closeDeposit()" class="w-full mt-2 text-gray-400 text-sm">Cancel</button>
+  </div>
+</div>
+
+<!-- WITHDRAW MODAL -->
+<div id="withdrawModal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center">
+  <div class="bg-[#11151b] p-6 rounded-xl w-[90%] md:w-[500px]">
+    <h2 class="text-lg font-semibold mb-4">Withdraw Earnings</h2>
+
+    <input id="withdrawAddr" type="text" placeholder="Destination BTC Address"
+      class="w-full p-2 mb-2 rounded bg-black border border-gray-700"/>
+
+    <input id="withdrawAmt" type="text" placeholder="Amount (BTC)"
+      class="w-full p-2 mb-4 rounded bg-black border border-gray-700"/>
+
+    <button onclick="submitWithdraw()"
+      class="w-full bg-primary text-black py-2 rounded font-semibold">
+      Request Payout
+    </button>
+
+    <button onclick="closeWithdraw()" class="w-full mt-2 text-gray-400 text-sm">Cancel</button>
+  </div>
+</div>
+
+<script>
+let state = {
+  deposit: 0,
+  earnings: 0,
+  unlocked: false
+};
+
+function updateUI() {
+  document.getElementById("deposit").innerText = state.deposit.toFixed(3) + " BTC";
+  document.getElementById("balance").innerText = state.earnings.toFixed(3) + " BTC";
+  document.getElementById("earnings").innerText = state.earnings.toFixed(3) + " BTC";
+
+  const btn = document.getElementById("withdrawBtn");
+  const note = document.getElementById("withdrawNote");
+
+  if (state.unlocked) {
+    btn.disabled = false;
+    btn.innerText = "Withdraw";
+    btn.classList.remove("bg-gray-700","text-gray-400","cursor-not-allowed");
+    btn.classList.add("bg-primary","text-black");
+    note.innerText = "Withdrawals are now active.";
+  }
+}
+
+function openDeposit(){
+  document.getElementById("depositModal").classList.remove("hidden");
+}
+
+function closeDeposit(){
+  document.getElementById("depositModal").classList.add("hidden");
+}
+
+function copyAddr(){
+  navigator.clipboard.writeText("bc1qfjxjpv2ee3el6yr8jxnga0tgp2krsjd4azr08x");
+  alert("Copied");
+}
+
+function submitDeposit(){
+  const amt = parseFloat(document.getElementById("amountInput").value) || 0;
+  const tx = document.getElementById("txInput").value;
+
+  closeDeposit();
+
+  addActivity(`Verifying deposit ${amt} BTC...`, "pending");
+
+  setTimeout(() => {
+    state.deposit = amt;
+    state.earnings = amt * 1.35; // simulated yield
+    state.unlocked = true;
+
+    updateUI();
+    addLedger(`Deposit confirmed: +${amt} BTC`);
+    addActivity(`Deposit confirmed: ${amt} BTC`, "success");
+  }, 3000);
+}
+
+function openWithdraw(){
+  if (!state.unlocked) return;
+  document.getElementById("withdrawModal").classList.remove("hidden");
+}
+
+function closeWithdraw(){
+  document.getElementById("withdrawModal").classList.add("hidden");
+}
+
+function submitWithdraw(){
+  const addr = document.getElementById("withdrawAddr").value;
+  const amt = parseFloat(document.getElementById("withdrawAmt").value) || 0;
+
+  closeWithdraw();
+
+  addActivity(`Processing payout of ${amt} BTC...`, "pending");
+
+  setTimeout(() => {
+    state.earnings -= amt;
+    updateUI();
+
+    addLedger(`Withdrawal: -${amt} BTC to ${addr}`);
+    addActivity(`Payout queued: ${amt} BTC`, "success");
+  }, 2000);
+}
+
+/* LIVE ACTIVITY */
+function addActivity(text, type){
+  const el = document.createElement("div");
+  el.className = "fade";
+  el.innerHTML = `
+    <span class="${type === 'success' ? 'text-primary' : 'text-yellow-400'}">
+      ${text}
+    </span>
+    <span class="text-gray-600 text-xs ml-2">${new Date().toLocaleTimeString()}</span>
+  `;
+  document.getElementById("activity").prepend(el);
+}
+
+/* LEDGER */
+function addLedger(text){
+  const el = document.createElement("div");
+  el.className = "border-b border-gray-800 py-1";
+  el.innerText = text;
+  document.getElementById("ledger").prepend(el);
+}
+
+/* FAKE LIVE FEED */
+setInterval(() => {
+  const types = ["deposit","withdrawal"];
+  const t = types[Math.floor(Math.random()*types.length)];
+  const amt = (Math.random()*0.05).toFixed(4);
+  const id = Math.floor(Math.random()*99999);
+
+  if(t === "deposit"){
+    addActivity(`User id_${id} deposited ${amt} BTC`, "success");
+  } else {
+    addActivity(`User id_${id} withdrew ${amt} BTC`, "pending");
+  }
+}, 5000);
+
+updateUI();
+</script>
+
+</body>
+</html>
